@@ -7,7 +7,6 @@
  */
 
 #include "common.h"
-#include "commands.h"
 
 /** 'Singleton' for chat commands */
 static struct bufferevent *pchat_cmd_bev;

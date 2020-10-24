@@ -17,9 +17,18 @@
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include "3rdparty/redblack.h"
+
+typedef struct pchat_conn {
+    char *peername;
+    char *peeraddr;
+    struct bufferevent *conn_bev;
+} pchat_conn_s;
 
 typedef struct {
     struct event_base *evbase;
     char *username;
+    struct rbtree *conn_tree;
 } pchat_ctx_s;
+
 
