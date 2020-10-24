@@ -6,11 +6,15 @@
  * 
  */
 #pragma once
+#define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <getopt.h>
+#include <string.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+
 

@@ -44,7 +44,7 @@ static void cmd_readcb(struct bufferevent *bev, void *ctx) {
 static void cmd_eventcb(struct bufferevent *bev, short events, void *ctx) {
     if (events & (BEV_EVENT_ERROR|BEV_EVENT_EOF)) {
          struct event_base *evb = ctx;
-         printf("Exiting...\n");
+         fprintf(stderr, "* Exiting...\n");
          /* Process all pending events and exit the loop */
          event_base_loopexit(evb, NULL);
     }
