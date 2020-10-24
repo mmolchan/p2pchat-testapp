@@ -8,15 +8,28 @@
 
 #include "common.h"
 #include "commands.h"
+#include "listener.h"
 
 static char *usage =
             "Usage: %s -n username\n";
 
 static pchat_ctx_s pchat_ctx;
 
+static void pchat_sigterm_cb(int s, short ev, void *arg) {
+    if (pchat_ctx.evbase) {
+        event_base_loopexit(pchat_ctx.evbase, NULL);
+    }
+}
+
 static void pchat_fini() {
     struct event_base *evbase = pchat_ctx.evbase;
     if (evbase) {
+        if (pchat_ctx.sigterm_ev) {
+            evsignal_del(pchat_ctx.sigterm_ev);
+            event_free(pchat_ctx.sigterm_ev);
+        }
+
+        pchat_listener_fini(&pchat_ctx);
         pchat_cmd_fini();
 
         /* Run remaining events that might be triggered by 'fini' routines */
@@ -28,10 +41,15 @@ static void pchat_fini() {
 
 static int pchat_init(int argc, char **argv) {
     int opt;
-    while (-1 != (opt = getopt(argc, argv, "n:"))) {
+    const char *bind_addr = NULL;
+
+    while (-1 != (opt = getopt(argc, argv, "n:l:"))) {
         switch(opt) {
             case 'n':
                 pchat_ctx.username = strdup(optarg);
+                break;
+            case 'l':
+                bind_addr = strdup(optarg);
                 break;
             default:
                 break;
@@ -45,7 +63,10 @@ static int pchat_init(int argc, char **argv) {
 
     pchat_ctx.evbase = event_base_new();
     if (pchat_ctx.evbase) {
-        if (0 == pchat_cmd_init(&pchat_ctx)) {
+        if (0 == pchat_listener_init(bind_addr, &pchat_ctx) &&
+            0 == pchat_cmd_init(&pchat_ctx)) {
+            pchat_ctx.sigterm_ev = evsignal_new(pchat_ctx.evbase, SIGTERM, pchat_sigterm_cb, NULL);
+            evsignal_add(pchat_ctx.sigterm_ev, NULL);
             return 0;
         }
     }
@@ -61,7 +82,7 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    fprintf(stderr, "* Starting chat as user: %s\n", pchat_ctx.username);
+    fprintf(stderr, "* Starting chat with username: %s\n", pchat_ctx.username);
 
     event_base_loop(pchat_ctx.evbase, 0);
 
