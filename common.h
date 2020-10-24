@@ -6,7 +6,11 @@
  * 
  */
 #pragma once
+#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <event2/event.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
 

@@ -7,7 +7,24 @@
  */
 
 #include "common.h"
+#include "commands.h"
 
-int main(char **argv, int argc) {
+int main(int argc, char **argv) {
+    struct event_base *evbase = event_base_new();
+    if (!evbase) { return -1; }
+
+    if (0 != pchat_cmd_init(evbase)) {
+        event_base_free(evbase);
+        return -1;
+    }
+
+    event_base_loop(evbase, 0);
+
+    pchat_cmd_fini();
+
+    /* Run remaining events that might be triggered by 'fini' routines */
+    event_base_loop(evbase, EVLOOP_ONCE|EVLOOP_NONBLOCK);
+    event_base_free(evbase);
+
     return 0;
 }
