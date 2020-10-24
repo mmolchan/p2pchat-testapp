@@ -12,44 +12,60 @@
 static char *usage =
             "Usage: %s -n username\n";
 
-int main(int argc, char **argv) {
-    char *username = NULL;
-    struct event_base *evbase = NULL;
-    int opt;
+static pchat_ctx_s pchat_ctx;
 
+static void pchat_fini() {
+    struct event_base *evbase = pchat_ctx.evbase;
+    if (evbase) {
+        pchat_cmd_fini();
+
+        /* Run remaining events that might be triggered by 'fini' routines */
+        event_base_loop(evbase, EVLOOP_ONCE|EVLOOP_NONBLOCK);
+        event_base_free(evbase);
+    }
+    free(pchat_ctx.username);
+}
+
+static int pchat_init(int argc, char **argv) {
+    int opt;
     while (-1 != (opt = getopt(argc, argv, "n:"))) {
         switch(opt) {
             case 'n':
-                username = strdup(optarg);
+                pchat_ctx.username = strdup(optarg);
                 break;
             default:
                 break;
         }
     }
 
-    if (!username) {
+    if (!pchat_ctx.username) {
         fprintf(stderr, usage, argv[0]);
         return -1;
     }
-    fprintf(stderr, "* Starting chat as user: %s\n", username);
 
-    evbase = event_base_new();
-    if (!evbase) {
+    pchat_ctx.evbase = event_base_new();
+    if (pchat_ctx.evbase) {
+        if (0 == pchat_cmd_init(&pchat_ctx)) {
+            return 0;
+        }
+    }
+
+    pchat_fini();
+    return -1;
+}
+
+int main(int argc, char **argv) {
+
+    if (0 != pchat_init(argc, argv)) {
+        fprintf(stderr, "* Init failed, exiting...\n");
         return -1;
     }
 
-    if (0 != pchat_cmd_init(evbase)) {
-        event_base_free(evbase);
-        return -1;
-    }
+    fprintf(stderr, "* Starting chat as user: %s\n", pchat_ctx.username);
 
-    event_base_loop(evbase, 0);
+    event_base_loop(pchat_ctx.evbase, 0);
 
-    pchat_cmd_fini();
-
-    /* Run remaining events that might be triggered by 'fini' routines */
-    event_base_loop(evbase, EVLOOP_ONCE|EVLOOP_NONBLOCK);
-    event_base_free(evbase);
+    pchat_fini();
 
     return 0;
 }

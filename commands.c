@@ -6,6 +6,7 @@
  * 
  */
 
+#include "common.h"
 #include "commands.h"
 
 /** 'Singleton' for chat commands */
@@ -14,7 +15,8 @@ static struct bufferevent *pchat_cmd_bev;
 static void cmd_readcb(struct bufferevent *bev, void *ctx);
 static void cmd_eventcb(struct bufferevent *bev, short events, void *ctx);
 
-int pchat_cmd_init(struct event_base *evb) {
+int pchat_cmd_init(pchat_ctx_s *pchat_ctx) {
+    struct event_base *evb = pchat_ctx->evbase;
     pchat_cmd_bev = bufferevent_socket_new(evb, STDIN_FILENO, BEV_OPT_DEFER_CALLBACKS|BEV_OPT_CLOSE_ON_FREE);
     if (pchat_cmd_bev) {
         bufferevent_setcb(pchat_cmd_bev, cmd_readcb, NULL, cmd_eventcb, evb);

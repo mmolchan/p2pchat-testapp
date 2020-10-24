@@ -1,6 +1,5 @@
 #pragma once
-#include "common.h"
 
-int pchat_cmd_init(struct event_base *evb);
+int pchat_cmd_init(pchat_ctx_s *pchat_ctx);
 void pchat_cmd_fini();
 
