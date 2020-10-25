@@ -49,7 +49,6 @@ typedef enum {
 typedef struct pchat_conn {
     struct pchat_ctx *pchat_ctx;
     char *peername;
-    //XXX char *peeraddr;
     struct bufferevent *bev;
     struct evbuffer *evb_in; /**< Accumulator for the partial network msgs */
     pchat_conn_state_t state;
@@ -61,8 +60,7 @@ typedef struct pchat_ctx {
     struct evconnlistener *listener; /**< In theory multiple listeners are OK */
     struct event *sigterm_ev;
     char *username;
-    struct rbtree *conn_tree_byname;
-    struct rbtree *conn_tree_bybev;
+    struct rbtree *conn_tree;        /**< Connections rbtree organized by uniaue peername */
 } pchat_ctx_s;
 
 //#define DEBUG

@@ -9,9 +9,11 @@
 #include "common.h"
 #include "commands.h"
 #include "listener.h"
+#include "connections.h"
 
 static char *usage =
-            "Usage: %s -n username\n";
+            "Usage: %s -n username -l listen_ip:port [-c connect_ip:port]\n"
+            "       multiple [-c] options can be passed\n";
 
 static pchat_ctx_s pchat_ctx;
 
@@ -29,6 +31,7 @@ static void pchat_fini() {
             event_free(pchat_ctx.sigterm_ev);
         }
 
+        pchat_conntree_free(pchat_ctx.conn_tree);
         pchat_listener_fini(&pchat_ctx);
         pchat_cmd_fini();
 
@@ -39,31 +42,64 @@ static void pchat_fini() {
     free(pchat_ctx.username);
 }
 
-static int pchat_init(int argc, char **argv) {
-    int opt;
-    const char *bind_addr = NULL;
+/** Converts 'a.b.c.d:xyz' format string to sockaddr
+ */
+static int pchat_sockaddr_parse(const char *addr, struct sockaddr_in *sin) {
+    char ip4[16] = {0};
+    unsigned port;
 
-    while (-1 != (opt = getopt(argc, argv, "n:l:"))) {
-        switch(opt) {
-            case 'n':
-                pchat_ctx.username = strdup(optarg);
-                break;
-            case 'l':
-                bind_addr = strdup(optarg);
-                break;
-            default:
-                break;
-        }
-    }
-
-    if (!pchat_ctx.username) {
-        fprintf(stderr, usage, argv[0]);
+    if (!addr || (2 != sscanf(addr, "%15[0-9\\.]:%u", ip4, &port))
+              || (port == 0) || (port > 65535)) {
+        fprintf(stderr, "* %s: IPv4 address '%s' format error\n", __func__, addr);
         return -1;
     }
 
+    memset(sin, 0, sizeof(*sin));
+    sin->sin_family = AF_INET;
+    sin->sin_addr.s_addr = inet_addr(ip4);
+    sin->sin_port = htons(port);
+    return 0;
+}
+
+static int pchat_init(int argc, char **argv) {
+    int opt;
+    struct sockaddr_in bind_sin;
+    struct sockaddr_in connect_sin;
+    bool failed = false;
+
     pchat_ctx.evbase = event_base_new();
+    pchat_ctx.conn_tree = pchat_conntree_new();
+
     if (pchat_ctx.evbase) {
-        if (0 == pchat_listener_init(bind_addr, &pchat_ctx) &&
+        while (-1 != (opt = getopt(argc, argv, "n:l:c:"))) {
+            switch(opt) {
+                case 'n':
+                    pchat_ctx.username = strdup(optarg);
+                    break;
+                case 'l':
+                    if (0 != pchat_sockaddr_parse(optarg, &bind_sin)) {
+                        failed = true;
+                    }
+                    break;
+                case 'c':
+                    if (0 != pchat_sockaddr_parse(optarg, &connect_sin) ||
+                        0 != pchat_conn_new(-1, (struct sockaddr*)&connect_sin, sizeof(connect_sin),
+                                &pchat_ctx, PCONN_DIR_CONNECT)) {
+                        failed = true;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (failed || !pchat_ctx.username) {
+            fprintf(stderr, usage, argv[0]);
+            pchat_fini();
+            return -1;
+        }
+
+        if (0 == pchat_listener_init((struct sockaddr*)&bind_sin, sizeof(bind_sin), &pchat_ctx) &&
             0 == pchat_cmd_init(&pchat_ctx)) {
             pchat_ctx.sigterm_ev = evsignal_new(pchat_ctx.evbase, SIGTERM, pchat_sigterm_cb, NULL);
             evsignal_add(pchat_ctx.sigterm_ev, NULL);
@@ -82,7 +118,8 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    fprintf(stderr, "* Starting chat with username: %s\n", pchat_ctx.username);
+    fprintf(stderr, "* Starting chat as username: %s\n", pchat_ctx.username);
+    fprintf(stderr, "* Write 'PeerName <message>' to send messages to PeerName\n");
 
     event_base_loop(pchat_ctx.evbase, 0);
 

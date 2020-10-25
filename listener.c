@@ -14,24 +14,11 @@ static void accept_error_cb(struct evconnlistener *listener, void *ctx);
 /** Creates a TCP listener
  * @param bind_addr Listen address in the "IP:port" form
  */
-int pchat_listener_init(const char *bind_addr, pchat_ctx_s *pchat_ctx) {
-    char ip4[16] = {0};
-    unsigned port;
-    struct sockaddr_in sin;
-
-    if (!bind_addr || (2 != sscanf(bind_addr, "%15[0-9\\.]:%u", ip4, &port)) || (port > 65535)) {
-        fprintf(stderr, "* %s: Bind address '%s' format error\n", __func__, bind_addr);
-        return -1;
-    }
-
-    memset(&sin, 0, sizeof(sin));
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = inet_addr(ip4);
-    sin.sin_port = htons(port);
+int pchat_listener_init(struct sockaddr *addr, int socklen, pchat_ctx_s *pchat_ctx) {
 
     pchat_ctx->listener = evconnlistener_new_bind(pchat_ctx->evbase, accept_conn_cb,
             pchat_ctx, LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE, -1,
-            (struct sockaddr*)&sin, sizeof(sin));
+            addr, socklen);
 
     if (!pchat_ctx->listener) {
         fprintf(stderr, "* %s: Listener creation failed\n", __func__);
