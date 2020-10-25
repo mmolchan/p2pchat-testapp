@@ -6,6 +6,7 @@
  * 
  */
 #include "common.h"
+#include "connections.h"
 
 static void accept_conn_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr, int socklen, void *ctx);
 static void accept_error_cb(struct evconnlistener *listener, void *ctx);
@@ -50,7 +51,9 @@ void pchat_listener_fini(pchat_ctx_s *pchat_ctx) {
 static void accept_conn_cb(struct evconnlistener *listener, evutil_socket_t fd,
         struct sockaddr *addr, int socklen, void *ctx) {
 
-    /* TODO add new TCP connection to the tree */
+    if (0 != pchat_conn_new(fd, addr, socklen, ctx, PCONN_DIR_ACCEPT)) {
+        fprintf(stderr, "* %s: Failed to accept connection on fd %u\n", __func__, fd);
+    }
 }
 
 static void accept_error_cb(struct evconnlistener *listener, void *ctx) {

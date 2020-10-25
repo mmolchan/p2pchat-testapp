@@ -29,20 +29,46 @@
 
 #include "3rdparty/redblack.h"
 
+/* Settings and constants */
+static const unsigned CONNECT_TMOUT = 10;
+#define PROTO_GREETING_HDR "PCHAT 1.0 Username:%s"
+
+/** P2P connection direction */
+typedef enum {
+    PCONN_DIR_CONNECT
+   ,PCONN_DIR_ACCEPT
+} pchat_conn_dir_t;
+
+typedef enum {
+    PCONN_ACCEPTED
+   ,PCONN_INITIATED
+   ,PCONN_ESTABLISHED /**< Can send messages, last stage */
+} pchat_conn_state_t;
+
 /** One P2P connection */
 typedef struct pchat_conn {
+    struct pchat_ctx *pchat_ctx;
     char *peername;
-    char *peeraddr;
-    struct bufferevent *conn_bev;
+    //XXX char *peeraddr;
+    struct bufferevent *bev;
+    struct evbuffer *evb_in; /**< Accumulator for the partial network msgs */
+    pchat_conn_state_t state;
 } pchat_conn_s;
 
 /** Root node for all app data and its connections */
-typedef struct {
+typedef struct pchat_ctx {
     struct event_base *evbase;
-    struct evconnlistener *listener; /*< In theory multiple listeners are OK */
+    struct evconnlistener *listener; /**< In theory multiple listeners are OK */
     struct event *sigterm_ev;
     char *username;
-    struct rbtree *conn_tree;
+    struct rbtree *conn_tree_byname;
+    struct rbtree *conn_tree_bybev;
 } pchat_ctx_s;
 
+//#define DEBUG
+#ifdef DEBUG
+# define LOG_DBG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+#else
+# define LOG_DBG(fmt, ...) while(0){}
+#endif /* DEBUG */
 
