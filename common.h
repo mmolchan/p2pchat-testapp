@@ -59,6 +59,7 @@ typedef struct pchat_ctx {
     struct event_base *evbase;
     struct evconnlistener *listener; /**< In theory multiple listeners are OK */
     struct event *sigterm_ev;
+    struct event *sigint_ev;
     char *username;
     struct rbtree *conn_tree;        /**< Connections rbtree organized by uniaue peername */
 } pchat_ctx_s;
@@ -69,4 +70,5 @@ typedef struct pchat_ctx {
 #else
 # define LOG_DBG(fmt, ...) while(0){}
 #endif /* DEBUG */
+
 

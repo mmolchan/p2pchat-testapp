@@ -56,6 +56,7 @@ static void cmd_readcb(struct bufferevent *bev, void *ctx) {
             if (readsz > strlen(peername) + 1) {
                 struct evbuffer *evb_out = bufferevent_get_output(peerconn->bev);
                 evbuffer_add_printf(evb_out, "%s\n", &in_cmd[strlen(peername) + 1]);
+                LOG_DBG("%s: sending '%s'\n", __func__, &in_cmd[strlen(peername) + 1]);
             }
             free(in_cmd);
         }

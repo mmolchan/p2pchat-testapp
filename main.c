@@ -25,13 +25,21 @@ static void pchat_sigterm_cb(int s, short ev, void *arg) {
 
 static void pchat_fini() {
     struct event_base *evbase = pchat_ctx.evbase;
+
+    pchat_conntree_free(pchat_ctx.conn_tree);
+    pchat_ctx.conn_tree = NULL;
+
     if (evbase) {
         if (pchat_ctx.sigterm_ev) {
             evsignal_del(pchat_ctx.sigterm_ev);
             event_free(pchat_ctx.sigterm_ev);
         }
 
-        pchat_conntree_free(pchat_ctx.conn_tree);
+        if (pchat_ctx.sigint_ev) {
+            evsignal_del(pchat_ctx.sigint_ev);
+            event_free(pchat_ctx.sigint_ev);
+        }
+
         pchat_listener_fini(&pchat_ctx);
         pchat_cmd_fini();
 
@@ -103,6 +111,9 @@ static int pchat_init(int argc, char **argv) {
             0 == pchat_cmd_init(&pchat_ctx)) {
             pchat_ctx.sigterm_ev = evsignal_new(pchat_ctx.evbase, SIGTERM, pchat_sigterm_cb, NULL);
             evsignal_add(pchat_ctx.sigterm_ev, NULL);
+
+            pchat_ctx.sigint_ev = evsignal_new(pchat_ctx.evbase, SIGINT, pchat_sigterm_cb, NULL);
+            evsignal_add(pchat_ctx.sigint_ev, NULL);
             return 0;
         }
     }

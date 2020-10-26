@@ -23,15 +23,29 @@ struct rbtree *pchat_conntree_new() {
     return rbcreate(conn_peername_cmp);
 }
 
+void _pchat_conn_signal_err(void *vconn) {
+    pchat_conn_s *pconn = vconn;
+    LOG_DBG("%s: signaling destroy conn for '%s'\n", __func__, pconn->peername);
+    bufferevent_trigger_event(pconn->bev, BEV_EVENT_ERROR, BEV_TRIG_DEFER_CALLBACKS);
+}
+
 void pchat_conntree_free(struct rbtree *conntree) {
     if (conntree) {
-        fprintf(stderr, "%s: FIXME tree traversal and conn removal\n", __func__);
+        rbdestroy(conntree, _pchat_conn_signal_err);
     }
 }
 
 void pchat_conn_free(pchat_conn_s *pconn) {
+    struct rbnode *rbnode;
     if (pconn) {
         struct bufferevent *bev = pconn->bev;
+
+        if (pconn->pchat_ctx->conn_tree) {
+            rbnode = rbfind(pconn->pchat_ctx->conn_tree, pconn);
+            if (rbnode) {
+                rbdelete(pconn->pchat_ctx->conn_tree, rbnode);
+            }
+        }
         if (bev) {
             bufferevent_disable(bev, EV_READ|EV_WRITE|EV_TIMEOUT);
             bufferevent_setcb(bev, NULL, NULL, NULL, NULL);
@@ -40,7 +54,6 @@ void pchat_conn_free(pchat_conn_s *pconn) {
         if (pconn->evb_in) {
             evbuffer_free(pconn->evb_in);
         }
-        /* XXX delete from trees, if any? */
         free(pconn->peername);
         free(pconn);
     }
@@ -51,7 +64,7 @@ void pchat_conn_free(pchat_conn_s *pconn) {
 int pchat_conn_new(evutil_socket_t fd, struct sockaddr *addr, int socklen,
         pchat_ctx_s *pchat_ctx, pchat_conn_dir_t dir) {
     struct event_base *evb = pchat_ctx->evbase;
-    struct timeval tmout = { .tv_sec = CONNECT_TMOUT, .tv_usec = 0 };
+    //struct timeval tmout = { .tv_sec = CONNECT_TMOUT, .tv_usec = 0 };
 
     pchat_conn_s *pconn = calloc(1, sizeof(*pconn));
     if (pconn) {
@@ -66,7 +79,8 @@ int pchat_conn_new(evutil_socket_t fd, struct sockaddr *addr, int socklen,
             bufferevent_enable(pconn->bev, EV_READ|EV_TIMEOUT);
             if (dir == PCONN_DIR_CONNECT) {
                 if (0 == bufferevent_socket_connect(pconn->bev, addr, socklen)) {
-                    bufferevent_set_timeouts(pconn->bev, &tmout, NULL);
+                    //XXX no timeouts for now TODO periodic reconnect is needed
+                    //bufferevent_set_timeouts(pconn->bev, &tmout, NULL);
                     return 0;
                 }
             } else {
@@ -88,6 +102,7 @@ static void conn_readcb(struct bufferevent *bev, void *ctx) {
 
     /* Concatenate for previously read partial data */
     evbuffer_remove_buffer(evb_in, pconn->evb_in, evbuffer_get_length(evb_in));
+    LOG_DBG("%s: %u bytes available for read\n", __func__, (unsigned)evbuffer_get_length(pconn->evb_in));
 
     do {
         in_msg = evbuffer_readln(pconn->evb_in, &readsz, EVBUFFER_EOL_CRLF);
